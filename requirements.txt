@@ -1,0 +1,33 @@
+# Install with: pip install -r requirements.txt
+
+# Core BEIR & NLP Libraries
+beir>=2.0.0
+sentence-transformers>=2.2.2
+transformers>=4.30.0
+torch>=2.0.0
+
+# Lexical Search
+rank-bm25>=0.2.2
+scikit-learn>=1.3.0
+
+# Vector Database (Person 3)
+faiss-cpu>=1.7.4 # or faiss-gpu if CUDA is available
+# Optional alternatives for Vector DB:
+# chromadb>=0.4.0
+# qdrant-client>=1.6.0
+
+# Evaluation & Profiling (Person 4)
+pandas>=2.0.0
+numpy>=1.24.0
+scipy>=1.10.0
+psutil>=5.9.0
+matplotlib>=3.7.0
+seaborn>=0.12.0
+
+# User Interface (Person 4)
+streamlit>=1.28.0
+
+# Utilities
+tqdm>=4.65.0
+rich>=13.0.0
+python-dotenv>=1.0.0

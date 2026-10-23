@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Data & Cached Embeddings
+data/scidocs/
+data/*.zip
+data/vector_index/*
+!data/vector_index/.gitkeep
+outputs/*.png
+outputs/*.csv
+outputs/*.json
+
+# IDEs & OS
+.vscode/
+.idea/
+.DS_Store
+*.swp
+*.swo
+
+# Jupyter
+.ipynb_checkpoints
