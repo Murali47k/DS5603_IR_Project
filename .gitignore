@@ -24,6 +24,7 @@ wheels/
 *.egg
 
 # Data & Cached Embeddings
+venv
 data/scidocs/
 data/*.zip
 data/vector_index/*
