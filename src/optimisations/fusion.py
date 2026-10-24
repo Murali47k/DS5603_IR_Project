@@ -8,8 +8,7 @@ from config import RRF_K, HYBRID_BM25_WEIGHT, HYBRID_DENSE_WEIGHT
 
 
 def reciprocal_rank_fusion(
-    ranked_results: List[List[str]],
-    k: int = RRF_K,
+    ranked_results: List[List[str]], k: int = RRF_K,
 ) -> List[Tuple[str, float]]:
     """
     Combine ranked document lists using Reciprocal Rank Fusion.
@@ -31,10 +30,8 @@ def reciprocal_rank_fusion(
 
 
 def weighted_score_fusion(
-    bm25_results: List[Tuple[str, float]],
-    dense_results: List[Tuple[str, float]],
-    bm25_weight: float = HYBRID_BM25_WEIGHT,
-    dense_weight: float = HYBRID_DENSE_WEIGHT,
+    bm25_results: List[Tuple[str, float]], dense_results: List[Tuple[str, float]],
+    bm25_weight: float = HYBRID_BM25_WEIGHT, dense_weight: float = HYBRID_DENSE_WEIGHT,
 ) -> List[Tuple[str, float]]:
     """
     Combine BM25 and dense retrieval scores using weighted addition.
