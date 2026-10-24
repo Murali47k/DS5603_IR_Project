@@ -20,6 +20,8 @@
 │   ├── vectordb/
 │   │   └── __init__.py
 │   └── data_loader.py
+├── test/
+│   └── README.md
 ├── .gitignore
 ├── config.py
 ├── README.md
