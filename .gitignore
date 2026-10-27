@@ -42,3 +42,4 @@ outputs/*.json
 
 # Jupyter
 .ipynb_checkpoints
+.venv/
