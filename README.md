@@ -52,3 +52,12 @@ See [`src/evaluation/README.md`](src/evaluation/README.md). From the repo root:
 ```
 
 Uses the local `data/scidocs` test split when present. Writes `outputs/baseline_eval.json` and `.csv` (gitignored).
+
+## Benchmark Results
+
+| Metric        | TF-IDF  | BM25    | Dense (MiniLM) |
+|---------------|---------|---------|----------------|
+| nDCG@10       | 0.13636 | 0.14950 | 0.21641        |
+| MAP@10        | 0.07691 | 0.08688 | 0.12938        |
+| Recall@10     | 0.14347 | 0.15428 | 0.23087        |
+| Precision@10  | 0.07060 | 0.07620 | 0.11400        |
