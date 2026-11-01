@@ -49,16 +49,28 @@ pytest -v
 See [`src/evaluation/README.md`](src/evaluation/README.md). From the repo root:
 
 ```bash
-.venv/bin/python -m src.evaluation.run_baselines
+venv/bin/python -m src.evaluation.run_baselines
 ```
 
-Uses the local `data/scidocs` test split when present. Writes `outputs/baseline_eval.json` and `.csv` (gitignored).
+Uses the local `data/scidocs` test split when present. Writes `outputs/baseline_eval.json` and `.csv`.
 
-## Benchmark Results
+## Hybrid & Optimisation Evaluation
 
-| Metric        | TF-IDF  | BM25    | Dense (MiniLM) |
-|---------------|---------|---------|----------------|
-| nDCG@10       | 0.13636 | 0.14950 | 0.21641        |
-| MAP@10        | 0.07691 | 0.08688 | 0.12938        |
-| Recall@10     | 0.14347 | 0.15428 | 0.23087        |
-| Precision@10  | 0.07060 | 0.07620 | 0.11400        |
+See [`src/optimisations/README.md`](src/optimisations/README.md). To run the full hybrid evaluation:
+
+```bash
+venv/bin/python -m src.optimisations.run_optimisations
+```
+
+Configuration defaults are maintained in [`config.yaml`](config.yaml).
+
+## Benchmark Results (BEIR SciDocs Test Split, $k=10$)
+
+| Model | Architecture | nDCG@10 | MAP@10 | Recall@10 | P@10 | Mean Latency |
+|:---|:---|:---|:---|:---|:---|:---|
+| **TF-IDF** | Lexical Baseline (scikit-learn) | 0.13636 | 0.07691 | 0.14347 | 0.07060 | 4.8 ms |
+| **BM25** | Lexical Baseline (rank-bm25) | 0.14950 | 0.08688 | 0.15428 | 0.07620 | 1.8 ms |
+| **Dense (MiniLM)** | Exhaustive Dot-Product (all-MiniLM-L6-v2) | 0.21641 | 0.12938 | 0.23087 | 0.11400 | ~120 ms |
+| **RRF Hybrid** | Reciprocal Rank Fusion ($K_{\text{cand}}=50$) | 0.19782 | 0.11774 | 0.20922 | 0.10330 | 134.0 ms |
+| **Weighted Hybrid** | Normalized Score Fusion (0.4 BM25 + 0.6 Dense) | **0.21340** | **0.12852** | **0.22782** | **0.11250** | 137.8 ms |
+| **Citation Hybrid** | Leak-Free Citation-Boosted Hybrid | **0.21340** | **0.12852** | **0.22782** | **0.11250** | 143.1 ms |
