@@ -16,37 +16,19 @@ from src.vectordb.index_builder import set_search_params
 
 
 def get_index_paths(index_dir: Path) -> Tuple[Path, Path, Path]:
-    """
-    Description: The three file paths used for one saved index.
-    Inputs: index_dir. Reads globals INDEX_FILE_NAME, IDS_FILE_NAME, META_FILE_NAME.
-    Outputs: (index_path, ids_path, meta_path).
-    Dependencies: pathlib.
-    Utilities: called by save_index(), load_index().
-    """
+    """Return paths to the index, IDs, and metadata files in the directory."""
     index_dir = Path(index_dir)
     return index_dir / INDEX_FILE_NAME, index_dir / IDS_FILE_NAME, index_dir / META_FILE_NAME
 
 
 def check_ids_match_index(index: faiss.Index, doc_ids: Sequence[str]) -> None:
-    """
-    Description: Stop early if the ID list and the index disagree on size.
-    Inputs: index, doc_ids.
-    Outputs: nothing; raises ValueError on mismatch.
-    Dependencies: none.
-    Utilities: called by save_index(), load_index().
-    """
+    """Validate that the count of doc IDs matches the number of vectors in the index."""
     if index.ntotal != len(doc_ids):
         raise ValueError(f"Index has {index.ntotal} vectors but {len(doc_ids)} doc IDs")
 
 
 def measure_index_bytes(index: faiss.Index) -> int:
-    """
-    Description: Size of the index in bytes (size when serialised, a good memory proxy).
-    Inputs: index.
-    Outputs: int number of bytes.
-    Dependencies: faiss.
-    Utilities: called by benchmark, save_index().
-    """
+    """Return the serialized byte size of the FAISS index."""
     return int(faiss.serialize_index(index).nbytes)
 
 
@@ -58,13 +40,7 @@ def save_index(
     search_params: Optional[Dict[str, Any]] = None,
     model_name: str = "",
 ) -> Path:
-    """
-    Description: Write index, doc IDs and a small meta file to a folder.
-    Inputs: index, doc_ids, index_type, index_dir, search_params, model_name.
-    Outputs: the folder path. Creates three files on disk.
-    Dependencies: get_index_paths(), check_ids_match_index(), measure_index_bytes().
-    Utilities: called by VectorDBRetriever.save().
-    """
+    """Serialize FAISS index, document ID mapping, and metadata to disk."""
     check_ids_match_index(index, doc_ids)
     index_path, ids_path, meta_path = get_index_paths(index_dir)
     index_path.parent.mkdir(parents=True, exist_ok=True)
@@ -83,14 +59,7 @@ def save_index(
 
 
 def load_index(index_dir: Path) -> Tuple[faiss.Index, List[str], Dict[str, Any]]:
-    """
-    Description: Read a saved index, its doc IDs and meta. Search settings are
-        re-applied because not every FAISS index remembers them.
-    Inputs: index_dir.
-    Outputs: (index, doc_ids, meta).
-    Dependencies: get_index_paths(), check_ids_match_index(), set_search_params().
-    Utilities: called by VectorDBRetriever.from_saved().
-    """
+    """Load serialized FAISS index, document ID list, and metadata from disk."""
     index_path, ids_path, meta_path = get_index_paths(index_dir)
     if not (index_path.is_file() and ids_path.is_file() and meta_path.is_file()):
         raise FileNotFoundError(f"No saved index found in {index_dir}")

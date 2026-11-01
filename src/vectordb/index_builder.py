@@ -28,38 +28,19 @@ from src.vectordb.embeddings import to_float32
 
 
 def get_embedding_dim(embeddings: np.ndarray) -> int:
-    """
-    Description: Read the vector size from the data (do not trust config.EMBEDDING_DIM,
-        which may not match the model: SPECTER=768, MiniLM=384).
-    Inputs: embeddings (2D array).
-    Outputs: int dimension.
-    Dependencies: none.
-    Utilities: called by every build_* function.
-    """
+    """Return the embedding dimension from a 2D embeddings array."""
     if embeddings.ndim != 2 or embeddings.shape[0] == 0:
         raise ValueError("embeddings must be a non-empty 2D array")
     return int(embeddings.shape[1])
 
 
 def _safe_nlist(n_vectors: int, nlist: int) -> int:
-    """
-    Description: Never ask for more clusters than there are vectors.
-    Inputs: n_vectors, nlist.
-    Outputs: a valid nlist (at least 1).
-    Dependencies: none.
-    Utilities: called by build_ivf(), build_ivfpq().
-    """
+    """Bound cluster count to at most the number of vectors, minimum 1."""
     return max(1, min(nlist, n_vectors))
 
 
 def _safe_pq_m(dim: int, pq_m: int) -> int:
-    """
-    Description: PQ needs dim to divide evenly by m. Pick the biggest m <= pq_m that does.
-    Inputs: dim, pq_m.
-    Outputs: valid m (at least 1).
-    Dependencies: none.
-    Utilities: called by build_ivfpq().
-    """
+    """Find the largest divisor of dim that is <= pq_m."""
     for candidate in range(min(pq_m, dim), 0, -1):
         if dim % candidate == 0:
             return candidate
@@ -67,24 +48,12 @@ def _safe_pq_m(dim: int, pq_m: int) -> int:
 
 
 def _make_quantizer(dim: int) -> faiss.IndexFlatIP:
-    """
-    Description: The small exact index IVF uses to find the nearest cluster centres.
-    Inputs: dim.
-    Outputs: IndexFlatIP.
-    Dependencies: faiss.
-    Utilities: called by build_ivf(), build_ivfpq().
-    """
+    """Create a flat inner-product quantizer for coarse cluster centroids."""
     return faiss.IndexFlatIP(dim)
 
 
 def build_flat(embeddings: np.ndarray) -> faiss.Index:
-    """
-    Description: Exact search index. Slow on big data, but always correct.
-    Inputs: embeddings.
-    Outputs: filled IndexFlatIP.
-    Dependencies: get_embedding_dim(), to_float32().
-    Utilities: called by build_index().
-    """
+    """Build a flat inner-product FAISS index for exact search."""
     data = to_float32(embeddings)
     index = faiss.IndexFlatIP(get_embedding_dim(data))
     index.add(data)
@@ -92,14 +61,7 @@ def build_flat(embeddings: np.ndarray) -> faiss.Index:
 
 
 def build_ivf(embeddings: np.ndarray, nlist: int = IVF_NLIST, nprobe: int = IVF_NPROBE) -> faiss.Index:
-    """
-    Description: Cluster the vectors into nlist groups. A query only looks into
-        nprobe groups, so it is faster but may miss some answers.
-    Inputs: embeddings, nlist, nprobe.
-    Outputs: trained and filled IndexIVFFlat.
-    Dependencies: _safe_nlist(), _make_quantizer(), set_search_params().
-    Utilities: called by build_index().
-    """
+    """Build an IVF flat index partitioning vectors into clusters."""
     data = to_float32(embeddings)
     dim = get_embedding_dim(data)
     nlist = _safe_nlist(data.shape[0], nlist)
@@ -116,13 +78,7 @@ def build_hnsw(
     ef_construction: int = HNSW_EF_CONSTRUCTION,
     ef_search: int = HNSW_EF_SEARCH,
 ) -> faiss.Index:
-    """
-    Description: Build a graph where close vectors are linked. Search walks the graph.
-    Inputs: embeddings, m (links per node), ef_construction, ef_search.
-    Outputs: filled IndexHNSWFlat.
-    Dependencies: get_embedding_dim(), set_search_params().
-    Utilities: called by build_index().
-    """
+    """Build an HNSW graph index for fast approximate nearest neighbor search."""
     data = to_float32(embeddings)
     index = faiss.IndexHNSWFlat(get_embedding_dim(data), m, faiss.METRIC_INNER_PRODUCT)
     index.hnsw.efConstruction = ef_construction
@@ -138,13 +94,7 @@ def build_ivfpq(
     pq_m: int = PQ_M,
     pq_nbits: int = PQ_NBITS,
 ) -> faiss.Index:
-    """
-    Description: IVF plus compressed vectors. Uses much less memory; scores are approximate.
-    Inputs: embeddings, nlist, nprobe, pq_m, pq_nbits.
-    Outputs: trained and filled IndexIVFPQ.
-    Dependencies: _safe_nlist(), _safe_pq_m(), _make_quantizer(), set_search_params().
-    Utilities: called by build_index().
-    """
+    """Build an IVF-PQ index with product quantization for reduced memory usage."""
     data = to_float32(embeddings)
     dim = get_embedding_dim(data)
     nlist = _safe_nlist(data.shape[0], nlist)
@@ -167,14 +117,7 @@ INDEX_BUILDERS: Dict[str, Callable[..., faiss.Index]] = {
 
 
 def build_index(index_type: str, embeddings: np.ndarray, **build_params: Any) -> faiss.Index:
-    """
-    Description: Build any supported index by name.
-    Inputs: index_type (one of ALL_INDEX_TYPES), embeddings, build_params (passed on).
-        Reads global INDEX_BUILDERS.
-    Outputs: a filled FAISS index.
-    Dependencies: INDEX_BUILDERS functions.
-    Utilities: called by VectorDBRetriever.from_corpus(), benchmark.
-    """
+    """Construct a FAISS index of the specified type."""
     if index_type not in INDEX_BUILDERS:
         raise ValueError(f"Unknown index_type '{index_type}'. Choose from {ALL_INDEX_TYPES}")
     return INDEX_BUILDERS[index_type](embeddings, **build_params)
@@ -186,14 +129,7 @@ def set_search_params(
     nprobe: Optional[int] = None,
     ef_search: Optional[int] = None,
 ) -> None:
-    """
-    Description: Change how hard the index searches. Bigger = slower but more accurate.
-        Settings that do not apply to this index type are ignored.
-    Inputs: index, index_type, nprobe (IVF/IVFPQ), ef_search (HNSW).
-    Outputs: nothing. Changes the index object in place.
-    Dependencies: faiss.
-    Utilities: called by build_ivf(), build_hnsw(), build_ivfpq(), store.load_index(), benchmark.
-    """
+    """Update runtime search parameters (nprobe for IVF, efSearch for HNSW)."""
     if index_type in (INDEX_IVF, INDEX_IVFPQ) and nprobe is not None:
         index.nprobe = int(nprobe)
     if index_type == INDEX_HNSW and ef_search is not None:

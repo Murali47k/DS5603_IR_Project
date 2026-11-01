@@ -27,36 +27,17 @@ TITLE_MAX_CHARS = 80     # long titles are cut to this length when printing
 
 
 def make_model_slug(model_name: str) -> str:
-    """
-    Description: Turn a model name into a safe folder name ("a/b" -> "a_b").
-    Inputs: model_name.
-    Outputs: string.
-    Dependencies: none.
-    Utilities: called by get_index_dir().
-    """
+    """Turn a model name into a safe directory name (e.g. 'a/b' -> 'a_b')."""
     return model_name.replace("/", "_").replace("\\", "_")
 
 
 def get_index_dir(index_type: str, model_name: str, base_dir: Path = VECTOR_INDEX_DIR) -> Path:
-    """
-    Description: Folder where this model + index type is saved.
-        Different models make different vectors, so each gets its own folder.
-    Inputs: index_type, model_name, base_dir (default config.VECTOR_INDEX_DIR).
-    Outputs: Path.
-    Dependencies: make_model_slug().
-    Utilities: called by main(); also use it when loading later.
-    """
+    """Return the storage path for a given model and index type combination."""
     return Path(base_dir) / f"{make_model_slug(model_name)}_{index_type}"
 
 
 def format_hit_line(rank: int, doc_id: str, score: float, corpus: Mapping[str, Any]) -> str:
-    """
-    Description: One printable line for a search result.
-    Inputs: rank, doc_id, score, corpus (to look up the title). Reads TITLE_MAX_CHARS.
-    Outputs: string.
-    Dependencies: none.
-    Utilities: called by print_demo_results().
-    """
+    """Format a single search hit with its rank, score, ID, and truncated title."""
     title = str(corpus.get(doc_id, {}).get("title", ""))[:TITLE_MAX_CHARS]
     return f"  {rank}. {score:.4f}  {doc_id}  {title}"
 
@@ -64,13 +45,7 @@ def format_hit_line(rank: int, doc_id: str, score: float, corpus: Mapping[str, A
 def print_demo_results(
     retriever: VectorDBRetriever, corpus: Mapping[str, Any], queries: Mapping[str, str]
 ) -> None:
-    """
-    Description: Search a few real queries and print the results.
-    Inputs: retriever, corpus, queries. Reads DEMO_QUERY_COUNT, DEMO_TOP_K.
-    Outputs: prints to the screen.
-    Dependencies: format_hit_line(), retriever.retrieve().
-    Utilities: called by main().
-    """
+    """Run sample queries through the retriever and print the top results."""
     for query_id in list(queries)[:DEMO_QUERY_COUNT]:
         print(f"\nQuery {query_id}: {queries[query_id][:TITLE_MAX_CHARS]}")
         for rank, (doc_id, score) in enumerate(retriever.retrieve(queries[query_id], k=DEMO_TOP_K), 1):
@@ -78,13 +53,7 @@ def print_demo_results(
 
 
 def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
-    """
-    Description: Read command line options.
-    Inputs: argv (optional). Reads global defaults.
-    Outputs: Namespace.
-    Dependencies: argparse.
-    Utilities: called by main().
-    """
+    """Parse command line arguments for building the vector database."""
     parser = argparse.ArgumentParser(description="Build and save the SciDocs vector database.")
     parser.add_argument("--data-dir", default=str(DATA_DIR))
     parser.add_argument("--model", default=DENSE_MODEL_NAME)
@@ -95,14 +64,7 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
 
 
 def main(argv: Optional[List[str]] = None) -> int:
-    """
-    Description: Load data, build the index, save it, and run the demo search.
-    Inputs: argv.
-    Outputs: exit code 0. Writes the embedding cache and the saved index folder.
-    Dependencies: load_official_scidocs(), load_dense_encoder(),
-        VectorDBRetriever.from_corpus(), retriever.save(), print_demo_results().
-    Utilities: command line entry point.
-    """
+    """Build, persist, and run a sanity search check on the vector index."""
     from src.evaluation.baselines import load_dense_encoder, load_official_scidocs
 
     args = parse_args(argv)

@@ -36,13 +36,7 @@ from src.vectordb.store import measure_index_bytes
 def compute_overlap_recall(
     exact_ids: Sequence[Sequence[str]], approx_ids: Sequence[Sequence[str]], k: int
 ) -> float:
-    """
-    Description: Average share of the exact top-k that the approximate index also returned.
-    Inputs: exact_ids and approx_ids (one list of doc IDs per query), k.
-    Outputs: float between 0 and 1.
-    Dependencies: none.
-    Utilities: called by run_one_setting().
-    """
+    """Compute average overlap recall of approximate hits against exact top-k."""
     if not exact_ids:
         return 0.0
     shares = []
@@ -55,13 +49,7 @@ def compute_overlap_recall(
 def search_one_by_one(
     index: Any, query_vectors: np.ndarray, doc_ids: Sequence[str], k: int
 ) -> Tuple[List[List[Tuple[str, float]]], List[float]]:
-    """
-    Description: Search each query separately and time only index.search().
-    Inputs: index, query_vectors (n, dim), doc_ids, k.
-    Outputs: (hits per query, seconds per query).
-    Dependencies: hits_from_search_row().
-    Utilities: called by run_one_setting().
-    """
+    """Execute queries individually to accurately measure search latencies."""
     all_hits, latencies = [], []
     k_search = min(k, len(doc_ids))
     for row in query_vectors:
@@ -76,13 +64,7 @@ def score_hits(
     query_ids: Sequence[str], all_hits: Sequence[Sequence[Tuple[str, float]]],
     qrels: Mapping[str, Mapping[str, int]], k: int,
 ) -> Dict[str, float]:
-    """
-    Description: nDCG/MAP/Recall/P @k using the same BEIR code as the baselines.
-    Inputs: query_ids, all_hits (same order), qrels, k.
-    Outputs: dict like {"NDCG@10": ...}.
-    Dependencies: src.evaluation.metrics.
-    Utilities: called by run_one_setting().
-    """
+    """Calculate retrieval metrics (NDCG, MAP, Recall, Precision) at cutoff k."""
     from src.evaluation.metrics import evaluate_beir_results, metrics_at_k, ranked_hits_to_beir_results
 
     results = ranked_hits_to_beir_results(dict(zip(query_ids, all_hits)))
@@ -90,13 +72,7 @@ def score_hits(
 
 
 def latency_summary_ms(latencies: Sequence[float]) -> Dict[str, float]:
-    """
-    Description: Mean and 95th percentile of latencies, in milliseconds.
-    Inputs: latencies in seconds.
-    Outputs: dict with mean and p95.
-    Dependencies: numpy.
-    Utilities: called by run_one_setting().
-    """
+    """Compute mean and 95th percentile query latencies in milliseconds."""
     if not latencies:
         return {"latency_mean_ms": 0.0, "latency_p95_ms": 0.0}
     ms = np.asarray(latencies) * 1000.0
@@ -111,14 +87,7 @@ def run_one_setting(
     query_ids: Sequence[str], query_vectors: np.ndarray, doc_ids: Sequence[str],
     qrels: Mapping[str, Mapping[str, int]], exact_ids: Sequence[Sequence[str]], k: int,
 ) -> Dict[str, Any]:
-    """
-    Description: Apply search settings, run all queries, and build one result row.
-    Inputs: see signature. Search settings are applied to the index.
-    Outputs: dict row for the report.
-    Dependencies: set_search_params(), search_one_by_one(), score_hits(),
-        compute_overlap_recall(), latency_summary_ms(), measure_index_bytes().
-    Utilities: called by run_benchmark().
-    """
+    """Evaluate one parameter configuration and compile performance metrics into a dict."""
     set_search_params(index, index_type, **search_params)
     all_hits, latencies = search_one_by_one(index, query_vectors, doc_ids, k)
     approx_ids = [[doc_id for doc_id, _ in hits] for hits in all_hits]
@@ -135,13 +104,7 @@ def run_one_setting(
 
 
 def make_setting_name(index_type: str, search_params: Mapping[str, Any]) -> str:
-    """
-    Description: Readable row name, e.g. "ivf nprobe=4".
-    Inputs: index_type, search_params.
-    Outputs: string.
-    Dependencies: none.
-    Utilities: called by run_benchmark().
-    """
+    """Format an index type and search parameters into a readable display string."""
     suffix = " ".join(f"{key}={value}" for key, value in search_params.items())
     return f"{index_type} {suffix}".strip()
 
@@ -149,13 +112,7 @@ def make_setting_name(index_type: str, search_params: Mapping[str, Any]) -> str:
 def compute_exact_top_ids(
     embeddings: np.ndarray, query_vectors: np.ndarray, doc_ids: Sequence[str], k: int
 ) -> List[List[str]]:
-    """
-    Description: The true top-k for every query, found with the exact Flat index.
-    Inputs: embeddings, query_vectors, doc_ids, k.
-    Outputs: list of ID lists.
-    Dependencies: build_index(), search_one_by_one().
-    Utilities: called by run_benchmark().
-    """
+    """Compute ground-truth top-k doc IDs per query using exact Flat index search."""
     flat = build_index(INDEX_FLAT, embeddings)
     hits, _ = search_one_by_one(flat, query_vectors, doc_ids, k)
     return [[doc_id for doc_id, _ in row] for row in hits]
@@ -166,13 +123,7 @@ def run_benchmark(
     query_vectors: np.ndarray, qrels: Mapping[str, Mapping[str, int]],
     k: int = DEFAULT_TOP_K, plan: Sequence = BENCHMARK_PLAN, skip_pq: bool = False,
 ) -> List[Dict[str, Any]]:
-    """
-    Description: Build each index in the plan once, then try each search setting.
-    Inputs: vectors, queries, qrels, k, plan (default BENCHMARK_PLAN), skip_pq.
-    Outputs: list of result rows.
-    Dependencies: compute_exact_top_ids(), build_index(), run_one_setting(), make_setting_name().
-    Utilities: called by main().
-    """
+    """Build and evaluate each index type under various search parameter settings."""
     exact_ids = compute_exact_top_ids(embeddings, query_vectors, doc_ids, k)
     rows = []
     for index_type, build_params, search_settings in plan:
@@ -190,13 +141,7 @@ def run_benchmark(
 
 
 def save_benchmark_report(rows: List[Dict[str, Any]], output_dir: Path, stem: str = BENCHMARK_STEM) -> Dict[str, Path]:
-    """
-    Description: Write the rows to JSON and CSV.
-    Inputs: rows, output_dir, stem.
-    Outputs: {"json": path, "csv": path}. Creates two files.
-    Dependencies: json, pandas.
-    Utilities: called by main().
-    """
+    """Save benchmark results to JSON and CSV formats."""
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     json_path, csv_path = output_dir / f"{stem}.json", output_dir / f"{stem}.csv"
@@ -206,13 +151,7 @@ def save_benchmark_report(rows: List[Dict[str, Any]], output_dir: Path, stem: st
 
 
 def parse_args(argv=None) -> argparse.Namespace:
-    """
-    Description: Read command line options.
-    Inputs: argv (optional list). Reads globals for defaults.
-    Outputs: Namespace.
-    Dependencies: argparse.
-    Utilities: called by main().
-    """
+    """Parse command line arguments for the benchmark runner."""
     parser = argparse.ArgumentParser(description="Benchmark FAISS index types on SciDocs.")
     parser.add_argument("--data-dir", default=str(DATA_DIR))
     parser.add_argument("--model", default=DENSE_MODEL_NAME)
@@ -224,14 +163,7 @@ def parse_args(argv=None) -> argparse.Namespace:
 
 
 def main(argv=None) -> int:
-    """
-    Description: Load SciDocs, encode (cached), run the benchmark, save and print the report.
-    Inputs: argv.
-    Outputs: exit code 0. Writes outputs/vectordb_benchmark.json/.csv and the embedding cache.
-    Dependencies: load_official_scidocs(), load_dense_encoder(), get_or_create_embeddings(),
-        encode_queries(), run_benchmark(), save_benchmark_report().
-    Utilities: command line entry point.
-    """
+    """Run vector database benchmark on SciDocs and print summary table."""
     from src.evaluation.baselines import load_dense_encoder, load_official_scidocs
 
     args = parse_args(argv)
