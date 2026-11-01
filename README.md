@@ -38,9 +38,10 @@ retriever = BM25Retriever(corpus)
 hits = retriever.retrieve(queries[next(iter(queries))], k=10)
 # hits: list of (doc_id, score)
 ```
+## To run all test
 
 ```bash
-python -m pytest tests/base_models tests/evaluation tests/optimisations/test_fusion.py tests/optimisations/test_citation_boost.py -q
+pytest -v
 ```
 
 ## Baseline SciDocs evaluation
