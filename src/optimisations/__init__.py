@@ -6,6 +6,7 @@ Evaluation of all three approaches lives in eval_optimisations.py / run_optimisa
 
 from src.optimisations.eval_optimisations import (
     evaluate_citation_hybrid,
+    evaluate_reranked_hybrid,
     evaluate_rrf_hybrid,
     evaluate_weighted_hybrid,
     run_optimisation_suite,
@@ -16,6 +17,7 @@ __all__ = [
     "evaluate_rrf_hybrid",
     "evaluate_weighted_hybrid",
     "evaluate_citation_hybrid",
+    "evaluate_reranked_hybrid",
     "run_optimisation_suite",
     "save_optimisation_report",
 ]
