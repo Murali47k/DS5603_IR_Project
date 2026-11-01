@@ -1,3 +1,9 @@
+import sys
+from pathlib import Path
+
+# Ensure project root is in sys.path when running script directly
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
 from src.optimisations.citation_boost import citation_aware_boost
 
 def test_citation_aware_boost():

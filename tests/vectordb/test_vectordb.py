@@ -1,6 +1,11 @@
 """Tests for src/vectordb. Uses a fake encoder and fake corpus: no downloads."""
 
 import random
+import sys
+from pathlib import Path
+
+# Ensure project root is in sys.path when running script directly
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 import numpy as np
 import pytest
@@ -169,3 +174,8 @@ def test_overlap_recall_helper():
     approx = [["a", "x"], ["c", "d"]]
     assert compute_overlap_recall(exact, approx, k=2) == 0.75
     assert compute_overlap_recall([], [], k=2) == 0.0
+
+
+if __name__ == "__main__":
+    sys.exit(pytest.main([__file__]))
+

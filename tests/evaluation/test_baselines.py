@@ -3,7 +3,11 @@
 Does not download SciDocs or pretrained models.
 """
 
+import sys
 from pathlib import Path
+
+# Ensure project root is in sys.path when running script directly
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from src.base_models import TfidfRetriever
 from src.evaluation.baselines import (
