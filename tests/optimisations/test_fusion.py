@@ -37,20 +37,41 @@ def test_weighted_score_fusion():
         ("doc3", 0.7),
     ]
 
-    fused = weighted_score_fusion(
+    # Test raw score combination (normalize=False)
+    fused_raw = weighted_score_fusion(
         bm25_results,
         dense_results,
         bm25_weight=0.5,
         dense_weight=0.5,
+        normalize=False,
     )
 
-    scores = dict(fused)
+    scores_raw = dict(fused_raw)
 
-    assert len(fused) == 3
-    assert abs(scores["doc1"] - 0.4) < 1e-9
-    assert abs(scores["doc2"] - 0.75) < 1e-9
-    assert abs(scores["doc3"] - 0.35) < 1e-9
-    assert fused[0][0] == "doc2"
+    assert len(fused_raw) == 3
+    assert abs(scores_raw["doc1"] - 0.4) < 1e-9
+    assert abs(scores_raw["doc2"] - 0.75) < 1e-9
+    assert abs(scores_raw["doc3"] - 0.35) < 1e-9
+    assert fused_raw[0][0] == "doc2"
+
+    # Test normalized score combination (normalize=True)
+    fused_norm = weighted_score_fusion(
+        bm25_results,
+        dense_results,
+        bm25_weight=0.5,
+        dense_weight=0.5,
+        normalize=True,
+    )
+    scores_norm = dict(fused_norm)
+    assert len(fused_norm) == 3
+    # bm25: doc1 -> (0.8-0.6)/(0.8-0.6)=1.0, doc2 -> 0.0
+    # dense: doc2 -> (0.9-0.7)/(0.9-0.7)=1.0, doc3 -> 0.0
+    # doc1: 0.5*1.0 + 0 = 0.5
+    # doc2: 0 + 0.5*1.0 = 0.5
+    # doc3: 0 + 0 = 0.0
+    assert abs(scores_norm["doc1"] - 0.5) < 1e-9
+    assert abs(scores_norm["doc2"] - 0.5) < 1e-9
+    assert abs(scores_norm["doc3"] - 0.0) < 1e-9
 
 
 if __name__ == "__main__":

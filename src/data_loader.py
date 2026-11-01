@@ -58,37 +58,61 @@ def load_scidocs(
 def get_document_citations(
     corpus: Dict[str, Dict[str, Any]],
     qrels: Optional[Dict[str, Dict[str, int]]] = None,
+    citation_file: Optional[Path | str] = None,
+    allow_qrels_fallback: bool = True,
 ) -> Dict[str, int]:
     """
     Return doc_id -> citation_count.
 
-    BEIR's SciDocs has NO citation-count field, so:
-    1. If a doc has a 'citations' / 'citation_count' value in its metadata, use it.
-    2. Otherwise, if `qrels` is given, use in-degree: the number of queries
-       (papers) that cite the doc (relevance > 0). This is a proxy computed
-       only over the loaded split, not the true global citation count.
-    3. Docs with neither get 0.
+    BEIR's SciDocs corpus jsonl has no built-in citation-count field, so:
+    1. If a `citation_file` path (JSON mapping doc_id -> int) is provided, load from it.
+    2. If a doc has a 'citations' / 'citation_count' value in its metadata, use it.
+    3. If `allow_qrels_fallback` is True and `qrels` is given, compute in-degree from the
+       qrels graph (the number of queries citing the paper).
+       NOTE ON EVALUATION LEAKAGE: When evaluating on a test split, using test qrels
+       introduces label leakage. Set `allow_qrels_fallback=False` for strict leak-free evaluation.
+    4. Docs with none of the above get 0.
     """
     counts: Dict[str, int] = {doc_id: 0 for doc_id in corpus}
 
-    # Fallback: in-degree from the qrels graph
-    if qrels:
-        for doc_scores in qrels.values():
-            for doc_id, score in doc_scores.items():
-                if score > 0 and doc_id in counts:
-                    counts[doc_id] += 1
+    # 1. External citation mapping file
+    if citation_file:
+        c_path = Path(citation_file)
+        if c_path.is_file():
+            import json
+            try:
+                loaded = json.loads(c_path.read_text(encoding="utf-8"))
+                for doc_id, val in loaded.items():
+                    if doc_id in counts:
+                        counts[doc_id] = int(val)
+                return counts
+            except Exception:
+                pass
 
-    # Preferred: explicit metadata if the corpus provides it
+    # 2. Preferred: explicit metadata if the corpus provides it
+    has_metadata_citations = False
     for doc_id, doc in corpus.items():
         meta = doc.get("metadata") or {}
         for key in ("citation_count", "citations"):
             value = meta.get(key, doc.get(key))
             if isinstance(value, int):
                 counts[doc_id] = value
+                has_metadata_citations = True
                 break
             if isinstance(value, (list, tuple)):
                 counts[doc_id] = len(value)
+                has_metadata_citations = True
                 break
+
+    if has_metadata_citations:
+        return counts
+
+    # 3. Fallback: in-degree from qrels (flagged to prevent unintentional test leakage)
+    if qrels and allow_qrels_fallback:
+        for doc_scores in qrels.values():
+            for doc_id, score in doc_scores.items():
+                if score > 0 and doc_id in counts:
+                    counts[doc_id] += 1
 
     return counts
 
