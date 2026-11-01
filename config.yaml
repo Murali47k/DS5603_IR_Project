@@ -1,0 +1,36 @@
+# =============================================================================
+# IR Project Optimisation Configuration
+# =============================================================================
+
+# Dense Retriever Model
+# sentence-transformers/all-MiniLM-L6-v2 is fast on CPU and achieves 0.216+ baseline
+dense_model: "sentence-transformers/all-MiniLM-L6-v2"
+dense_fallback: "sentence-transformers/all-MiniLM-L6-v2"
+
+# Candidate Pool & Top-k
+k: 10                     # Top-K final evaluated documents
+candidate_k: 50           # Deep candidate pool retrieved per method before fusion
+
+# Weighted Hybrid Search
+bm25_weight: 0.4          # BM25 weight
+dense_weight: 0.6         # Dense weight
+no_normalize: false       # false = keep Min-Max score normalization enabled
+
+# Reciprocal Rank Fusion (RRF)
+rrf_k: 60
+
+# Citation-Aware Boosting
+citation_boost_weight: 0.1
+allow_qrels_citations: false
+
+# Cross-Encoder Reranking
+include_reranker: false
+reranker_model: "cross-encoder/ms-marco-MiniLM-L-6-v2"
+
+# FAISS Vector Index
+index_type: "hnsw"        # Options: hnsw, flat, ivf, ivfpq
+no_cache: false
+
+# Output Directory
+output_dir: "outputs"
+stem: "optimisation_eval"
