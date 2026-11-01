@@ -45,17 +45,33 @@ def _split_into_batches(items: Sequence[str], batch_size: int) -> List[Sequence[
     return [items[i : i + batch_size] for i in range(0, len(items), batch_size)]
 
 
-def encode_texts(encoder: Any, texts: Sequence[str], batch_size: int = ENCODE_BATCH_SIZE) -> np.ndarray:
+def encode_texts(
+    encoder: Any,
+    texts: Sequence[str],
+    batch_size: int = ENCODE_BATCH_SIZE,
+    show_progress: bool = True,
+) -> np.ndarray:
     """Encode texts in batches and return normalized vector embeddings."""
     if len(texts) == 0:
         return np.zeros((0, 0), dtype=EMBEDDING_DTYPE)
-    parts = [np.asarray(encoder.encode(list(batch))) for batch in _split_into_batches(texts, batch_size)]
+    batches = _split_into_batches(texts, batch_size)
+    if show_progress and len(batches) > 1:
+        try:
+            from tqdm import tqdm
+            batches = tqdm(
+                batches,
+                desc=f"Encoding {len(texts)} documents",
+                unit="batch",
+            )
+        except ImportError:
+            pass
+    parts = [np.asarray(encoder.encode(list(batch))) for batch in batches]
     return normalize_rows(np.vstack(parts))
 
 
 def encode_queries(encoder: Any, queries: Sequence[str]) -> np.ndarray:
     """Encode query strings into normalized vector embeddings."""
-    return encode_texts(encoder, list(queries))
+    return encode_texts(encoder, list(queries), show_progress=False)
 
 
 def build_cache_key(model_name: str, doc_ids: Sequence[str], texts: Sequence[str]) -> str:
@@ -104,6 +120,7 @@ def get_or_create_embeddings(
     cache_dir: Path,
     batch_size: int = ENCODE_BATCH_SIZE,
     use_cache: bool = True,
+    show_progress: bool = True,
 ) -> Tuple[List[str], np.ndarray]:
     """Retrieve embeddings from disk cache if available, or compute and cache them."""
     doc_ids, texts = corpus_texts(corpus)
@@ -114,9 +131,12 @@ def get_or_create_embeddings(
     if use_cache:
         cached = load_embeddings(cache_dir, cache_key)
         if cached is not None:
+            print(f"Loaded cached embeddings from {cache_dir} ({len(cached[0])} documents).")
             return cached
 
-    embeddings = encode_texts(encoder, texts, batch_size)
+    print(f"Encoding {len(texts)} documents with '{model_name}' (one-time setup, caching to {cache_dir})...")
+    embeddings = encode_texts(encoder, texts, batch_size, show_progress=show_progress)
     if use_cache:
         save_embeddings(cache_dir, cache_key, doc_ids, embeddings)
+        print(f"Saved {len(doc_ids)} embeddings to disk cache.")
     return doc_ids, embeddings

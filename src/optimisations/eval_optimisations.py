@@ -165,7 +165,7 @@ def _retrieve_rrf(
     items = list(queries.items())
     try:
         from tqdm import tqdm
-        items = tqdm(items, desc="rrf queries", leave=False)
+        items = tqdm(items, desc="Approach 1 (RRF queries)", leave=True)
     except ImportError:
         pass
 
@@ -195,7 +195,7 @@ def _retrieve_weighted(
     items = list(queries.items())
     try:
         from tqdm import tqdm
-        items = tqdm(items, desc="weighted queries", leave=False)
+        items = tqdm(items, desc="Approach 2 (Weighted queries)", leave=True)
     except ImportError:
         pass
 
@@ -230,7 +230,7 @@ def _retrieve_citation_boosted(
     items = list(queries.items())
     try:
         from tqdm import tqdm
-        items = tqdm(items, desc="citation queries", leave=False)
+        items = tqdm(items, desc="Approach 3 (Citation queries)", leave=True)
     except ImportError:
         pass
 
@@ -332,11 +332,14 @@ def run_optimisation_suite(
     rows: List[Dict[str, Any]] = []
 
     # Build BM25 once — shared across all three approaches.
+    print(f"\n[1/5] Building BM25 index over {len(corpus)} documents...")
     bm25_start = time.perf_counter()
     bm25 = BM25Retriever(corpus)
     bm25_index_seconds = round(time.perf_counter() - bm25_start, 4)
+    print(f"BM25 index ready in {bm25_index_seconds:.2f}s.")
 
     # Build the VectorDB retriever (FAISS-backed) once — shared across all three.
+    print(f"\n[2/5] Setting up VectorDB retriever ({index_type}) with model '{dense_model}'...")
     dense, dense_meta = _build_vector_retriever(
         corpus,
         model_name=dense_model,
@@ -347,6 +350,7 @@ def run_optimisation_suite(
     )
 
     if dense is None:
+        print(f"Warning: VectorDBRetriever unavailable: {dense_meta.get('error', '')}")
         for name in ("rrf_hybrid", "weighted_hybrid", "citation_hybrid"):
             rows.append({
                 "model": name,
@@ -368,6 +372,7 @@ def run_optimisation_suite(
     }
 
     # 1. RRF Hybrid
+    print(f"\n[3/5] Evaluating Approach 1: Reciprocal Rank Fusion (k={k}, rrf_k={rrf_k})...")
     metrics, latencies = evaluate_rrf_hybrid(bm25, dense, queries, qrels, k=k, rrf_k=rrf_k)
     rows.append({
         "model": "rrf_hybrid",
@@ -380,6 +385,7 @@ def run_optimisation_suite(
     })
 
     # 2. Weighted Score Hybrid
+    print(f"\n[4/5] Evaluating Approach 2: Weighted Score Fusion (BM25={bm25_weight}, Dense={dense_weight})...")
     metrics, latencies = evaluate_weighted_hybrid(
         bm25, dense, queries, qrels, k=k,
         bm25_weight=bm25_weight, dense_weight=dense_weight,
@@ -396,6 +402,7 @@ def run_optimisation_suite(
     })
 
     # 3. Citation-Boosted Hybrid
+    print(f"\n[5/5] Evaluating Approach 3: Citation-Boosted Hybrid (boost_weight={citation_boost_weight})...")
     metrics, latencies = evaluate_citation_hybrid(
         bm25, dense, queries, qrels, citation_counts, k=k,
         bm25_weight=bm25_weight, dense_weight=dense_weight,

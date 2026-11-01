@@ -76,10 +76,13 @@ class VectorDBRetriever(BaseRetriever):
         search_params: Optional[Dict[str, Any]] = None,
         cache_dir: Optional[Path] = None,
         use_cache: bool = True,
+        show_progress: bool = True,
     ) -> "VectorDBRetriever":
         """Build an index from corpus texts and return an initialized retriever."""
         cache_dir = Path(cache_dir) if cache_dir else Path(VECTOR_INDEX_DIR) / EMBEDDINGS_SUBDIR
-        doc_ids, embeddings = get_or_create_embeddings(corpus, encoder, model_name, cache_dir, use_cache=use_cache)
+        doc_ids, embeddings = get_or_create_embeddings(
+            corpus, encoder, model_name, cache_dir, use_cache=use_cache, show_progress=show_progress
+        )
         if not doc_ids:
             return cls(None, [], encoder, index_type, model_name, search_params)
         index = build_index(index_type, embeddings, **(build_params or {}))
