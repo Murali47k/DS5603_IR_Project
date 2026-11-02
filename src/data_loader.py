@@ -93,7 +93,7 @@ def get_document_citations(
     has_metadata_citations = False
     for doc_id, doc in corpus.items():
         meta = doc.get("metadata") or {}
-        for key in ("citation_count", "citations"):
+        for key in ("cited_by", "citation_count", "citations"):
             value = meta.get(key, doc.get(key))
             if isinstance(value, int):
                 counts[doc_id] = value
@@ -103,6 +103,31 @@ def get_document_citations(
                 counts[doc_id] = len(value)
                 has_metadata_citations = True
                 break
+
+    # 2b. If BEIR loader stripped metadata, extract 'cited_by' directly from corpus.jsonl
+    if not has_metadata_citations:
+        corpus_file = DEFAULT_DATA_DIR / "scidocs" / "corpus.jsonl"
+        if corpus_file.is_file():
+            import json
+            try:
+                with corpus_file.open("r", encoding="utf-8") as f:
+                    for line in f:
+                        entry = json.loads(line)
+                        doc_id = entry.get("_id")
+                        if doc_id in counts:
+                            meta = entry.get("metadata") or {}
+                            for key in ("cited_by", "citation_count", "citations"):
+                                value = meta.get(key, entry.get(key))
+                                if isinstance(value, int):
+                                    counts[doc_id] = value
+                                    has_metadata_citations = True
+                                    break
+                                if isinstance(value, (list, tuple)):
+                                    counts[doc_id] = len(value)
+                                    has_metadata_citations = True
+                                    break
+            except Exception:
+                pass
 
     if has_metadata_citations:
         return counts

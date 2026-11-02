@@ -74,3 +74,4 @@ Configuration defaults are maintained in [`config.yaml`](config.yaml).
 | **RRF Hybrid** | Reciprocal Rank Fusion ($K_{\text{cand}}=50$) | 0.19782 | 0.11774 | 0.20922 | 0.10330 | 134.0 ms |
 | **Weighted Hybrid** | Normalized Score Fusion (0.4 BM25 + 0.6 Dense) | **0.21340** | **0.12852** | **0.22782** | **0.11250** | 137.8 ms |
 | **Citation Hybrid** | Leak-Free Citation-Boosted Hybrid | **0.21340** | **0.12852** | **0.22782** | **0.11250** | 143.1 ms |
+| **Cross-Encoder Hybrid** | Re-ranked Hybrid (ms-marco-MiniLM-L-6-v2) | 0.17317 | 0.10054 | 0.18385 | 0.09070 | 3493.3 ms |

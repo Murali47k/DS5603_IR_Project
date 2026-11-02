@@ -132,6 +132,7 @@ Comparison between baselines and hybrid optimisation approaches ($k=10$):
 | **RRF Hybrid** | Rank Fusion ($K_{\text{cand}}=50$) | 0.19782 | 0.11774 | 0.20922 | 0.10330 | 134.0 ms |
 | **Weighted Hybrid** | Normalized Fusion ($0.4/0.6$) | **0.21340** | **0.12852** | **0.22782** | **0.11250** | 137.8 ms |
 | **Citation Hybrid** | Leak-free Citation Boost | **0.21340** | **0.12852** | **0.22782** | **0.11250** | 143.1 ms |
+| **Cross-Encoder Hybrid** | CE Re-ranker (`ms-marco-MiniLM-L-6-v2`) | 0.17317 | 0.10054 | 0.18385 | 0.09070 | 3493.3 ms |
 
 ### Key Observations & Improvements
 1. **+42.7% gain over BM25**: Weighted hybrid improves nDCG@10 from `0.14950` to `0.21340` and Recall@10 from `0.15428` to `0.22782`.
@@ -139,3 +140,4 @@ Comparison between baselines and hybrid optimisation approaches ($k=10$):
 3. **Deep Candidate Pool ($K_{\text{cand}}=50$)**: Retrieving top-50 candidates prior to fusion avoids the shallow 10-document bottleneck and boosts recall significantly.
 4. **HNSW Scalability**: Weighted hybrid uses an approximate nearest-neighbour FAISS HNSW graph index rather than exhaustive exact matrix multiplication, delivering sub-150ms query times on 25k+ documents.
 5. **Leak-free Citation Evaluation**: Citation counts are strictly decoupled from test-set relevance labels (`allow_qrels_citations=false`), ensuring scientific evaluation integrity.
+6. **Cross-Encoder Domain Shift & Latency Trade-off**: The Cross-Encoder (`ms-marco-MiniLM-L-6-v2`) scores `0.17317` nDCG@10 at `3493.3 ms` latency. While outperforming BM25 (`0.14950`), it trails bi-encoder representations due to out-of-domain transfer (MS MARCO web QA vs. scientific terminology) and incurs a ~25× CPU latency penalty from evaluating 50 full cross-attention pairs per query.
