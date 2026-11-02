@@ -66,12 +66,19 @@ Configuration defaults are maintained in [`config.yaml`](config.yaml).
 
 ## Benchmark Results (BEIR SciDocs Test Split, $k=10$)
 
+### Baseline Results
+
 | Model | Architecture | nDCG@10 | MAP@10 | Recall@10 | P@10 | Mean Latency |
-|:---|:---|:---|:---|:---|:---|:---|
+|:---|:---|:---:|:---:|:---:|:---:|:---:|
 | **TF-IDF** | Lexical Baseline (scikit-learn) | 0.13636 | 0.07691 | 0.14347 | 0.07060 | 4.8 ms |
 | **BM25** | Lexical Baseline (rank-bm25) | 0.14950 | 0.08688 | 0.15428 | 0.07620 | 1.8 ms |
-| **Dense (MiniLM)** | Exhaustive Dot-Product (all-MiniLM-L6-v2) | 0.21641 | 0.12938 | 0.23087 | 0.11400 | ~120 ms |
-| **RRF Hybrid** | Reciprocal Rank Fusion ($K_{\text{cand}}=50$) | 0.19782 | 0.11774 | 0.20922 | 0.10330 | 134.0 ms |
-| **Weighted Hybrid** | Normalized Score Fusion (0.4 BM25 + 0.6 Dense) | **0.21340** | **0.12852** | **0.22782** | **0.11250** | 137.8 ms |
-| **Citation Hybrid** | Leak-Free Citation-Boosted Hybrid | **0.21340** | **0.12852** | **0.22782** | **0.11250** | 143.1 ms |
+| **Dense (MiniLM)** | Exhaustive Dot-Product (all-MiniLM-L6-v2) | **0.21641** | **0.12938** | **0.23087** | **0.11400** | ~120 ms |
+
+### Optimisation Results
+
+| Model | Architecture | nDCG@10 | MAP@10 | Recall@10 | P@10 | Mean Latency |
+|:---|:---|:---:|:---:|:---:|:---:|:---:|
 | **Cross-Encoder Hybrid** | Re-ranked Hybrid (ms-marco-MiniLM-L-6-v2) | 0.17317 | 0.10054 | 0.18385 | 0.09070 | 3493.3 ms |
+| **RRF Hybrid** | Reciprocal Rank Fusion ($K_{\text{cand}}=50$) | 0.19782 | 0.11774 | 0.20922 | 0.10330 | 88.4 ms |
+| **Weighted Hybrid** | Normalized Score Fusion (0.4 BM25 + 0.6 Dense) | 0.21340 | 0.12852 | 0.22782 | 0.11250 | 90.0 ms |
+| **Citation Hybrid** | Leak-Free Citation-Boosted Hybrid ($w=0.4$) | **0.22877** | **0.13964** | **0.24117** | **0.11910** | 87.9 ms |

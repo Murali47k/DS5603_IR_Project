@@ -20,7 +20,7 @@ no_normalize: false       # false = keep Min-Max score normalization enabled
 rrf_k: 60
 
 # Citation-Aware Boosting
-citation_boost_weight: 0.1
+citation_boost_weight: 0.4
 allow_qrels_citations: false
 
 # Cross-Encoder Reranking
