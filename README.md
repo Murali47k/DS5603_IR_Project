@@ -64,6 +64,16 @@ venv/bin/python -m src.optimisations.run_optimisations
 
 Configuration defaults are maintained in [`config.yaml`](config.yaml).
 
+## SciDocs search UI
+
+See [`src/ui/README.md`](src/ui/README.md). From the repo root:
+
+```bash
+.venv/bin/streamlit run src/ui/app.py
+```
+
+Default engine: citation-boosted hybrid retrieval (BM25 + FAISS + `citation_aware_boost`, $w=0.4$).
+
 ## Benchmark Results (BEIR SciDocs Test Split, $k=10$)
 
 ### Baseline Results
