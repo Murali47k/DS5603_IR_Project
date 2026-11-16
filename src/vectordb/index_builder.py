@@ -123,6 +123,33 @@ def build_index(index_type: str, embeddings: np.ndarray, **build_params: Any) ->
     return INDEX_BUILDERS[index_type](embeddings, **build_params)
 
 
+def build_and_save_from_npy(
+    vectors_path: str,
+    ids_path: str,
+    index_dir: str,
+    index_type: str,
+    model_name: str = "",
+) -> None:
+    """Build a FAISS index from cached embeddings and write it to disk.
+
+    Run this in a process that has not imported PyTorch. FAISS HNSW
+    construction uses OpenMP; PyTorch ships a second libomp on macOS, and
+    calling ``IndexHNSW.add`` in the same process segfaults.
+    """
+    import json
+    from pathlib import Path
+
+    from src.vectordb.store import save_index
+
+    faiss.omp_set_num_threads(1)
+    vectors = to_float32(np.load(vectors_path))
+    if not vectors.flags.writeable:
+        vectors = np.array(vectors, copy=True)
+    doc_ids = json.loads(Path(ids_path).read_text(encoding="utf-8"))
+    index = build_index(index_type, vectors)
+    save_index(index, doc_ids, index_type, Path(index_dir), {}, model_name)
+
+
 def set_search_params(
     index: faiss.Index,
     index_type: str,

@@ -15,6 +15,8 @@ from src.base_models.base import BaseRetriever
 from src.ui.metadata import (
     PaperRecord,
     load_paper_catalog,
+    lookup_display_papers,
+    lookup_papers,
     parse_jsonl_record,
     year_bounds,
 )
@@ -28,11 +30,21 @@ class FakeRetriever(BaseRetriever):
         self.doc_ids = list(doc_ids or [doc_id for doc_id, _ in hits])
         self.index = None
         self.encoder = None
+        self.calls = 0
 
     def retrieve(self, query: str, k: int = 10):
+        self.calls += 1
         if not str(query).strip():
             return []
         return list(self.hits[:k])
+
+
+class FakeReranker:
+    """Reverses candidate order so cross-encoder differs from weighted fusion."""
+
+    def rerank(self, query: str, candidates):
+        scored = [(doc_id, float(i)) for i, (doc_id, _doc) in enumerate(candidates)]
+        return sorted(scored, key=lambda item: item[1], reverse=True)
 
 
 class FakeIndex:
@@ -93,7 +105,10 @@ def _engine(dense: FakeRetriever | None = None) -> SearchEngine:
     bm25 = FakeRetriever([("old-low", 0.90), ("new-high", 0.85), ("mid", 0.10)])
     if dense is None:
         dense = FakeRetriever([("old-low", 0.90), ("new-high", 0.85), ("mid", 0.10)])
-    return SearchEngine(corpus, catalog, bm25, dense, _settings())
+    tfidf = FakeRetriever([("mid", 0.99), ("old-low", 0.40), ("new-high", 0.10)])
+    return SearchEngine(
+        corpus, catalog, bm25, dense, _settings(), tfidf=tfidf, reranker=FakeReranker()
+    )
 
 
 def test_parse_jsonl_record_reads_scidocs_metadata():
@@ -186,10 +201,82 @@ def test_compare_keeps_hybrid_when_dense_is_missing():
     engine.dense = None
     engine.dense_error = "no faiss"
     compared = engine.compare("graphs", k=2, boost_weight=0.4)
-    assert compared["dense"].results == []
-    assert compared["dense"].error
+    assert set(compared) == {
+        "bm25",
+        "tfidf",
+        "dense",
+        "citation_hybrid",
+        "cross_encoder",
+        "rrf",
+        "weighted",
+    }
     assert compared["citation_hybrid"].results
     assert compared["bm25"].results
+    assert compared["rrf"].results
+    assert compared["weighted"].results
+    assert compared["tfidf"].results
+    assert compared["cross_encoder"].results
+    assert compared["dense"].error
+    assert compared["rrf"].error
+    assert compared["weighted"].error
+
+
+def test_compare_runs_optimisation_approaches():
+    engine = _engine()
+    compared = engine.compare("graphs", k=3, boost_weight=0.4)
+    assert compared["rrf"].method == "rrf"
+    assert compared["weighted"].method == "weighted"
+    assert compared["citation_hybrid"].method == "citation_hybrid"
+    assert compared["bm25"].method == "bm25"
+    assert compared["tfidf"].method == "tfidf"
+    assert compared["dense"].method == "dense"
+    assert compared["cross_encoder"].method == "cross_encoder"
+    assert compared["weighted"].results[0].citation_multiplier is None
+    assert compared["citation_hybrid"].results[0].citation_multiplier is not None
+    assert compared["tfidf"].results[0].paper.doc_id == "mid"
+    assert compared["tfidf"].results[0].tfidf_score is not None
+    assert compared["weighted"].results[0].norm_bm25_score is not None
+    assert compared["weighted"].results[0].norm_dense_score is not None
+    assert compared["rrf"].results[0].bm25_rank is not None
+    assert compared["rrf"].results[0].rrf_bm25_term is not None
+    assert compared["cross_encoder"].results[0].candidate_rank is not None
+    assert compared["cross_encoder"].results[0].ce_score is not None
+    assert compared["cross_encoder"].results
+    assert compared["bm25"].latency_ms is not None
+
+
+def test_missing_component_scores_stay_none():
+    catalog = _catalog()
+    corpus = {doc_id: {"title": rec.title, "text": rec.abstract} for doc_id, rec in catalog.items()}
+    bm25 = FakeRetriever([("old-low", 0.9), ("mid", 0.2)])
+    dense = FakeRetriever([("new-high", 0.8), ("mid", 0.1)])
+    engine = SearchEngine(corpus, catalog, bm25, dense, _settings())
+    response = engine.search("graphs", k=3, boost_weight=0.0)
+    by_id = {hit.paper.doc_id: hit for hit in response.results}
+    assert by_id["old-low"].dense_score is None
+    assert by_id["old-low"].bm25_score == 0.9
+    assert by_id["new-high"].bm25_score is None
+    assert by_id["new-high"].dense_score == 0.8
+
+
+def test_unresolved_citations_are_hidden_from_display_lists():
+    catalog = _catalog()
+    catalog["new-high"].cited_by = ["mid", "missing-hash"]
+    catalog["new-high"].references = ["old-low", "another-missing"]
+    catalog["new-high"].citation_count = 2
+    corpus = {doc_id: {"title": rec.title, "text": rec.abstract} for doc_id, rec in catalog.items()}
+    engine = SearchEngine(
+        corpus, catalog, FakeRetriever([]), FakeRetriever([]), _settings()
+    )
+    visible_cited = engine.visible_cited_by("new-high")
+    visible_refs = engine.visible_references("new-high")
+    assert [paper.doc_id for paper in visible_cited] == ["mid"]
+    assert [paper.doc_id for paper in visible_refs] == ["old-low"]
+    assert engine.paper("new-high").cited_by == ["mid", "missing-hash"]
+    assert engine.paper("new-high").citation_count == 2
+    placeholders = lookup_papers(catalog, ["missing-hash"])
+    assert placeholders[0].title.startswith("Paper not present")
+    assert lookup_display_papers(catalog, ["missing-hash"]) == []
 
 
 def test_find_similar_excludes_query_document():
@@ -209,6 +296,17 @@ def test_find_similar_excludes_query_document():
     ids = [hit.paper.doc_id for hit in neighbours]
     assert "old-low" not in ids
     assert ids[0] == "new-high"
+
+
+def test_compare_calls_each_retriever_once():
+    engine = _engine()
+    engine.bm25.calls = 0
+    engine.dense.calls = 0
+    engine.tfidf.calls = 0
+    engine.compare("graphs", k=3, boost_weight=0.4)
+    assert engine.bm25.calls == 1
+    assert engine.dense.calls == 1
+    assert engine.tfidf.calls == 1
 
 
 def test_build_search_engine_without_dataset():
@@ -239,6 +337,10 @@ if __name__ == "__main__":
     test_year_and_citation_filters()
     test_empty_query_returns_no_results()
     test_compare_keeps_hybrid_when_dense_is_missing()
+    test_compare_runs_optimisation_approaches()
+    test_missing_component_scores_stay_none()
+    test_unresolved_citations_are_hidden_from_display_lists()
     test_find_similar_excludes_query_document()
+    test_compare_calls_each_retriever_once()
     test_build_search_engine_without_dataset()
     print("UI tests passed!")

@@ -155,10 +155,18 @@ def latency_stats(latencies: Sequence[float]) -> Dict[str, float]:
     }
 
 
-def load_dense_encoder(model_name: str, local_files_only: bool = False):
+def load_dense_encoder(
+    model_name: str,
+    local_files_only: bool = False,
+    device: Optional[str] = None,
+):
     from sentence_transformers import SentenceTransformer
 
-    return SentenceTransformer(model_name, local_files_only=local_files_only)
+    return SentenceTransformer(
+        model_name,
+        local_files_only=local_files_only,
+        device=device,
+    )
 
 
 def try_build_dense_retriever(

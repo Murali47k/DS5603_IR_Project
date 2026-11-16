@@ -12,15 +12,18 @@ from config import RERANKER_MODEL_NAME, RERANK_TOP_K
 class CrossEncoderReranker:
     """Re-rank retrieved documents using a Cross-Encoder."""
 
-    def __init__( 
-        self, model_name: str = RERANKER_MODEL_NAME,
+    def __init__(
+        self,
+        model_name: str = RERANKER_MODEL_NAME,
         top_k: int = RERANK_TOP_K,
+        device: str = "cpu",
     ):
         if top_k <= 0:
             raise ValueError("top_k must be positive")
 
-        self.model = CrossEncoder(model_name)
+        self.model = CrossEncoder(model_name, device=device)
         self.top_k = top_k
+        self.device = device
 
     def rerank(
         self, query: str,

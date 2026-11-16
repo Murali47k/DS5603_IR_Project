@@ -15,6 +15,8 @@ from config import (
     HYBRID_BM25_WEIGHT,
     HYBRID_DENSE_WEIGHT,
     PROJECT_ROOT,
+    RERANKER_MODEL_NAME,
+    RRF_K,
     VECTOR_INDEX_DIR,
 )
 from src.vectordb.constants import INDEX_HNSW
@@ -36,8 +38,10 @@ class UISettings:
     index_type: str
     data_dir: str
     vector_index_dir: str
+    rrf_k: int = RRF_K
     snippet_chars: int = 320
     similar_k: int = 5
+    reranker_model: str = RERANKER_MODEL_NAME
 
 
 def _yaml_data(path: Path) -> Dict[str, Any]:
@@ -64,4 +68,6 @@ def load_ui_settings(path: Path = YAML_PATH) -> UISettings:
         index_type=str(data.get("index_type") or INDEX_HNSW),
         data_dir=str(DATA_DIR),
         vector_index_dir=str(VECTOR_INDEX_DIR),
+        rrf_k=int(data.get("rrf_k") or RRF_K),
+        reranker_model=str(data.get("reranker_model") or RERANKER_MODEL_NAME),
     )
