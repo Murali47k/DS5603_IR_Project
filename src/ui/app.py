@@ -41,21 +41,13 @@ mpl_cache_dir = ROOT / "data" / ".matplotlib"
 mpl_cache_dir.mkdir(parents=True, exist_ok=True)
 os.environ.setdefault("MPLCONFIGDIR", str(mpl_cache_dir))
 
-import matplotlib.pyplot as plt
-import numpy as np
 import pandas as pd
-import seaborn as sns
 import streamlit as st
 
 from src.ui.comparison import (
     COMPARE_METHOD_ORDER,
     METHOD_SPECS,
-    build_insights,
-    correlation_matrix,
     intersection_of,
-    rank_map_from_results,
-    rank_mover_segments,
-    rank_movers,
     summarize_overlap,
 )
 from src.ui.compare_views import render_head_to_head, render_rank_matrix
@@ -336,7 +328,7 @@ def _offline_metric_cell(value) -> str:
 
 
 def render_benchmark_section(compared: dict[str, SearchResponse]) -> None:
-    st.markdown("### Benchmark comparison (offline metrics vs. this query)")
+    st.markdown("### Benchmark comparison (on SciDocs dataset in BEIR)")
     st.markdown("**Offline SciDocs held-out test split evaluation ($k = 10$) vs. Live query retrieval time**")
     st.caption(
         "Offline metrics are computed over the official BEIR SciDocs evaluation suite (1,000 queries) with "
@@ -392,109 +384,19 @@ def render_benchmark_section(compared: dict[str, SearchResponse]) -> None:
     st.bar_chart(chart_df.set_index("Approach"))
 
 
-def _heatmap_figure(matrix: np.ndarray, labels: list[str], title: str, fmt: str, vmin, vmax, cmap: str):
-    fig, ax = plt.subplots(figsize=(8.2, 6.2))
-    mask = np.isnan(matrix)
-    sns.heatmap(
-        matrix,
-        annot=True,
-        fmt=fmt,
-        xticklabels=labels,
-        yticklabels=labels,
-        cmap=cmap,
-        vmin=vmin,
-        vmax=vmax,
-        ax=ax,
-        square=True,
-        linewidths=0.4,
-        mask=mask if mask.any() else None,
-        cbar_kws={"shrink": 0.75},
-    )
-    plt.setp(ax.get_xticklabels(), rotation=35, ha="right")
-    ax.set_title(title)
-    fig.tight_layout()
-    return fig
-
-
 def render_overlap_section(engine: SearchEngine, compared: dict[str, SearchResponse], k: int) -> None:
     st.markdown("### Retrieval overlap analysis")
-    st.caption(
-        f"Pairwise Jaccard similarity across all seven approaches at cutoff $k = {k}$: "
-        r"$J(A,B) = \frac{|A \cap B|}{|A \cup B|}$. "
-        "Calculated strictly using unique document IDs (titles and duplicates are never conflated)."
-    )
     summary = summarize_overlap(compared, k=k, order=COMPARE_METHOD_ORDER)
-    labels = [METHOD_LABELS[key] for key in COMPARE_METHOD_ORDER]
-    fig = _heatmap_figure(
-        summary.jaccard,
-        labels,
-        f"Jaccard Overlap Matrix (% of Shared IDs at Top-{k})",
-        fmt=".0%",
-        vmin=0.0,
-        vmax=1.0,
-        cmap="Blues",
+
+    st.markdown("**Degree-of-Sharing Distribution**")
+    st.caption(f"How many methods retrieved the same papers at top-{k} (sharing breakdown):")
+    dist_df = pd.DataFrame(
+        {
+            "Category": list(summary.sharing_distribution.keys()),
+            "Number of Papers": list(summary.sharing_distribution.values()),
+        }
     )
-    st.pyplot(fig, use_container_width=True)
-    plt.close(fig)
-
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.metric("Total Unique Papers Retrieved", summary.total_unique_docs)
-        st.caption(f"Union size across all 7 methods at top-{k}")
-    with col2:
-        st.metric("Complete Consensus Papers", len(summary.shared_by_all))
-        st.caption("Papers retrieved by ALL 7 approaches")
-    with col3:
-        unique_total = sum(summary.unique_counts.values())
-        st.metric("Total Single-Method Papers", unique_total)
-        st.caption("Papers retrieved by only 1 approach")
-
-    left, right = st.columns(2)
-    with left:
-        st.markdown("**Degree-of-Sharing Distribution**")
-        st.caption("How many methods retrieved the same papers (sharing breakdown):")
-        dist_df = pd.DataFrame(
-            {
-                "Category": list(summary.sharing_distribution.keys()),
-                "Number of Papers": list(summary.sharing_distribution.values()),
-            }
-        )
-        st.bar_chart(dist_df.set_index("Category"))
-
-    with right:
-        st.markdown("**Unique Papers Per Method**")
-        st.caption("Number of papers retrieved exclusively by each method:")
-        unique_df = pd.DataFrame(
-            {
-                "Approach": [METHOD_LABELS[key] for key in COMPARE_METHOD_ORDER],
-                "Unique papers": [summary.unique_counts[key] for key in COMPARE_METHOD_ORDER],
-            }
-        )
-        st.bar_chart(unique_df.set_index("Approach"))
-
-    with st.expander("Inspect unique and consensus paper titles", expanded=False):
-        if summary.shared_by_all:
-            st.markdown(f"**Papers retrieved by all seven methods ({len(summary.shared_by_all)}):**")
-            for doc_id in summary.shared_by_all:
-                paper = engine.paper(doc_id)
-                st.markdown(f"- `{doc_id}`: **{paper.title}** ({paper.citation_count} cites)")
-        else:
-            st.info("No single paper was retrieved by all seven methods at this cutoff.")
-
-        st.markdown("**Exclusively retrieved papers by method:**")
-        any_unique = False
-        for key in COMPARE_METHOD_ORDER:
-            u_ids = summary.unique_ids.get(key, [])
-            if u_ids:
-                any_unique = True
-                st.markdown(f"- **{METHOD_LABELS[key]}** ({len(u_ids)} unique):")
-                for uid in u_ids[:5]:
-                    p = engine.paper(uid)
-                    st.markdown(f"  - `{uid}`: {p.title} ({p.citation_count} cites)")
-                if len(u_ids) > 5:
-                    st.caption(f"  ... and {len(u_ids) - 5} more")
-        if not any_unique:
-            st.write("No method retrieved unique papers at this cutoff.")
+    st.bar_chart(dist_df.set_index("Category"))
 
     st.markdown("**Interactive Multi-Method Intersection**")
     st.caption("Select two or more approaches to inspect their shared documents:")
@@ -513,145 +415,6 @@ def render_overlap_section(engine: SearchEngine, compared: dict[str, SearchRespo
         for doc_id in shared[:15]:
             paper = engine.paper(doc_id)
             st.markdown(f"- `{doc_id}` · **{paper.title}** ({paper.citation_count} citations)")
-
-
-def render_ranking_section(engine: SearchEngine, compared: dict[str, SearchResponse], k: int) -> None:
-    st.markdown("### Ranking analysis")
-    st.caption(
-        "Rank agreement measures whether approaches rank their shared documents in the same relative order. "
-        "Missing documents are strictly excluded from pairwise rank correlation; they are never treated as rank zero."
-    )
-    rank_maps = {
-        key: rank_map_from_results(compared[key].results, k) for key in COMPARE_METHOD_ORDER
-    }
-    labels = [METHOD_LABELS[key] for key in COMPARE_METHOD_ORDER]
-    spearman, n_common = correlation_matrix(rank_maps, COMPARE_METHOD_ORDER, kind="spearman")
-    kendall, _n_kendall = correlation_matrix(rank_maps, COMPARE_METHOD_ORDER, kind="kendall")
-
-    corr_tab, kendall_tab = st.tabs(["Spearman rank correlation (ρ)", "Kendall's tau (τ)"])
-    with corr_tab:
-        fig = _heatmap_figure(
-            spearman,
-            labels,
-            f"Spearman ρ on Shared Documents (top-{k})",
-            fmt=".2f",
-            vmin=-1.0,
-            vmax=1.0,
-            cmap="RdBu_r",
-        )
-        st.pyplot(fig, use_container_width=True)
-        plt.close(fig)
-        st.markdown(
-            r"""
-            **Spearman's $\rho$ Formula**:
-            $$\rho = 1 - \frac{6 \sum d_i^2}{n(n^2 - 1)}$$
-            where $d_i = \text{rank}_A(d_i) - \text{rank}_B(d_i)$ is the rank difference on shared document $d_i$, and $n$ is the number of shared documents ($n \ge 2$).
-            Grey/masked cells indicate fewer than two shared documents, where rank correlation is mathematically undefined.
-            """
-        )
-    with kendall_tab:
-        fig = _heatmap_figure(
-            kendall,
-            labels,
-            f"Kendall's τ on Shared Documents (top-{k})",
-            fmt=".2f",
-            vmin=-1.0,
-            vmax=1.0,
-            cmap="RdBu_r",
-        )
-        st.pyplot(fig, use_container_width=True)
-        plt.close(fig)
-        st.markdown(
-            r"""
-            **Kendall's $\tau$ Formula**:
-            $$\tau = \frac{C - D}{\frac{1}{2} n (n - 1)}$$
-            where $C$ is the number of concordant pairs and $D$ is the number of discordant pairs.
-            $\tau = 1.0$ indicates identical relative ordering, while $\tau = -1.0$ indicates completely inverted ordering.
-            """
-        )
-
-    n_df = pd.DataFrame(n_common, index=labels, columns=labels)
-    st.caption("Number of shared document IDs ($N_{\text{common}}$) available for each correlation pair:")
-    st.dataframe(n_df, use_container_width=True)
-
-    movers = rank_movers(rank_maps, COMPARE_METHOD_ORDER, min_methods=2, limit=20)
-    if movers:
-        st.markdown("#### Rank comparison across methods (Slope / Bump chart)")
-        st.caption(
-            "Visualises how the rank of the same document changes between approaches (rank #1 is best). "
-            "Continuous lines join only consecutive retrieved methods to avoid false rank interpolation."
-        )
-
-        mover_options = [mover.doc_id for mover in movers]
-        format_mover_title = lambda did: f"{engine.paper(did).title[:55]}… [spread: {next(m.spread for m in movers if m.doc_id == did)}]"
-
-        selected_mover_ids = st.multiselect(
-            "Select papers to highlight in plot (defaults to top 6 rank movers)",
-            options=mover_options,
-            default=mover_options[:6],
-            format_func=format_mover_title,
-            key="rank_movers_selected",
-        )
-
-        active_movers = [m for m in movers if m.doc_id in selected_mover_ids]
-        if active_movers:
-            fig, ax = plt.subplots(figsize=(10.0, 5.5))
-            colors = plt.cm.tab10(np.linspace(0, 1, max(len(active_movers), 1)))
-
-            for idx, mover in enumerate(active_movers):
-                color = colors[idx % 10]
-                label_text = f"#{idx+1}: {engine.paper(mover.doc_id).title[:35]}…"
-                segments = rank_mover_segments(mover, COMPARE_METHOD_ORDER)
-                plotted_label = False
-                for seg_xs, seg_ys in segments:
-                    ax.plot(
-                        seg_xs,
-                        seg_ys,
-                        marker="o",
-                        linewidth=2.0,
-                        markersize=6,
-                        color=color,
-                        label=label_text if not plotted_label else None,
-                    )
-                    plotted_label = True
-
-            ax.set_xticks(list(range(len(COMPARE_METHOD_ORDER))))
-            ax.set_xticklabels(labels, rotation=30, ha="right", fontsize=9)
-            ax.invert_yaxis()
-            ax.set_ylabel("Rank Position (1 = Best)", fontsize=10)
-            ax.set_ylim(k + 1, 0.5)
-            ax.set_title(f"Rank Movement Across Approaches (Top-{k})", fontsize=11, fontweight="bold")
-            ax.grid(axis="y", linestyle=":", alpha=0.6)
-            ax.legend(bbox_to_anchor=(1.02, 1), loc="upper left", fontsize=8, frameon=True)
-            fig.tight_layout()
-            st.pyplot(fig, use_container_width=True)
-            plt.close(fig)
-
-        st.markdown("**Rank Movement Table (Papers in 2+ methods)**")
-        st.dataframe(
-            pd.DataFrame(
-                [
-                    {
-                        "Paper Title": engine.paper(item.doc_id).title,
-                        "ID": item.doc_id,
-                        "Rank Spread": item.spread,
-                        **{METHOD_LABELS[m]: f"#{item.ranks[m]}" if m in item.ranks else "—" for m in COMPARE_METHOD_ORDER},
-                    }
-                    for item in movers
-                ]
-            ),
-            hide_index=True,
-            use_container_width=True,
-        )
-    else:
-        st.info("No paper appears in two or more methods at this cutoff, so a rank comparison plot is not available.")
-
-    insights = build_insights(summarize_overlap(compared, k=k), rank_maps, COMPARE_METHOD_ORDER, METHOD_LABELS)
-    st.markdown("#### Automated Query Insights & Observations")
-    st.markdown('<div class="insight-box">', unsafe_allow_html=True)
-    for note in insights.notes:
-        st.markdown(f"- {note}")
-    st.markdown("</div>", unsafe_allow_html=True)
 
 
 def comparison_cache_key(query: str, params: dict) -> tuple:
@@ -687,7 +450,7 @@ COMPARE_VIEWS = (
     "Overview (all 7)",
     "Head-to-head",
     "Single method",
-    "Benchmarks & deep analysis",
+    "Benchmark & overlap",
 )
 
 
@@ -722,8 +485,6 @@ def render_comparison_dashboard(engine: SearchEngine, compared: dict[str, Search
         render_benchmark_section(compared)
         st.markdown("---")
         render_overlap_section(engine, compared, k=k)
-        st.markdown("---")
-        render_ranking_section(engine, compared, k=k)
 
 
 def sidebar_controls(engine: SearchEngine) -> dict:

@@ -141,7 +141,7 @@ def head_to_head_rows(
 def _rank_color(rank: float, k: int) -> str:
     """Solid colour (light base) so dark text stays readable in light and dark themes."""
     if rank is None or (isinstance(rank, float) and np.isnan(rank)):
-        return "background-color: #e5e7eb; color: #9ca3af"
+        return "background-color: #e5e7eb; color: #4b5563; font-weight: 700"
     t = min(max((float(rank) - 1.0) / max(k - 1, 1), 0.0), 1.0)
     # rank 1 -> strong green, rank k -> pale green
     r = int(26 + (226 - 26) * t ** 0.7)
@@ -173,9 +173,9 @@ def render_rank_matrix(st, engine, compared: Mapping[str, object], k: int) -> No
     st.markdown("#### All 7 methods at a glance")
     st.caption(
         f"Each row is a paper that appears in at least one method's top-{k}. "
-        "The number is that method's rank for the paper (1 = best); "
-        "**—** means the method did not return it in its top-"
-        f"{k}. Green = ranked high, pale = ranked low, grey = not returned. "
+        "The number is that method's rank for the paper (1 = best). "
+        f"A grey cell with a dash means the method did not return it in its top-{k}. "
+        "Green cells are ranked high and pale cells are ranked low. "
         "Papers at the top are the ones most methods agree on. Click a column header to sort."
     )
 
@@ -198,8 +198,8 @@ def render_rank_matrix(st, engine, compared: Mapping[str, object], k: int) -> No
             help="Set to 7 to see only papers every method agrees on.",
         )
     with c2:
-        row_cap = st.select_slider(
-            "Rows to show", options=[15, 30, 60, 120, 500], value=30, key="matrix_rows",
+        row_cap = st.slider(
+            "Rows to show", min_value=10, max_value=100, value=30, step=10, key="matrix_rows",
         )
 
     view = table[table["found_by"] >= min_found]
@@ -215,9 +215,21 @@ def render_rank_matrix(st, engine, compared: Mapping[str, object], k: int) -> No
         }
     )
     method_cols = [SHORT_LABELS[m] for m in order]
-    styler = display.style.format({c: "{:.0f}" for c in method_cols}, na_rep="—")
+    styler = display.style.format({c: "{:.0f}" for c in method_cols}, na_rep="-")
     styler = _style_map(styler, lambda v: _rank_color(v, k), subset=method_cols)
-    st.dataframe(styler, hide_index=True, use_container_width=True, height=min(80 + 36 * len(display), 760))
+    column_config = {
+        "Paper": st.column_config.TextColumn("Paper", width="medium"),
+        "Cites": st.column_config.NumberColumn("Cites", width="small"),
+        "Found by": st.column_config.NumberColumn("Found by", width="small"),
+        **{c: st.column_config.NumberColumn(c, width="small") for c in method_cols},
+    }
+    st.dataframe(
+        styler,
+        hide_index=True,
+        use_container_width=True,
+        column_config=column_config,
+        height=min(80 + 36 * len(display), 760),
+    )
     st.caption(f"Showing {len(display)} of {total_rows} papers · union of the 7 top-{k} lists has {len(table)} papers.")
 
     # --- compact overlap summary -------------------------------------------------
