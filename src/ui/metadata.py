@@ -9,6 +9,8 @@ from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence
 
 from src.data_loader import DEFAULT_DATA_DIR
 
+UNRESOLVED_PAPER_TITLE = "Paper not present in the loaded SciDocs corpus"
+
 
 @dataclass
 class PaperRecord:
@@ -167,11 +169,41 @@ def lookup_papers(
             results.append(
                 PaperRecord(
                     doc_id=doc_id,
-                    title="Paper not present in the loaded SciDocs corpus",
+                    title=UNRESOLVED_PAPER_TITLE,
                     abstract="",
                 )
             )
         else:
+            results.append(record)
+    return results
+
+
+def paper_has_display_metadata(record: Optional[PaperRecord]) -> bool:
+    """True when a citation neighbour has a title/abstract we can show."""
+    if record is None:
+        return False
+    title = (record.title or "").strip()
+    if not title or title == UNRESOLVED_PAPER_TITLE:
+        return False
+    if title == "Untitled paper" and not (record.abstract or "").strip() and not record.authors:
+        return False
+    return True
+
+
+def lookup_display_papers(
+    catalog: Mapping[str, PaperRecord],
+    doc_ids: Sequence[str],
+) -> List[PaperRecord]:
+    """
+    Return citation neighbours that have usable metadata.
+
+    IDs missing from the loaded SciDocs catalog are omitted from the UI list.
+    The original ID lists on PaperRecord are left unchanged.
+    """
+    results: List[PaperRecord] = []
+    for doc_id in doc_ids:
+        record = catalog.get(doc_id)
+        if paper_has_display_metadata(record):
             results.append(record)
     return results
 
