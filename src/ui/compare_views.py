@@ -17,7 +17,6 @@ import pandas as pd
 from src.ui.comparison import (
     COMPARE_METHOD_ORDER,
     jaccard,
-    pairwise_rank_correlation,
     rank_map_from_results,
     summarize_overlap,
 )
@@ -325,16 +324,10 @@ def render_head_to_head(st, engine, compared: Mapping[str, object], k: int) -> N
         return
 
     shared = set(ranks_a) & set(ranks_b)
-    corr = pairwise_rank_correlation(ranks_a, ranks_b, kind="spearman")
-    m1, m2, m3, m4 = st.columns(4)
+    m1, m2, m3 = st.columns(3)
     m1.metric(f"Shared in top-{k}", f"{len(shared)} / {k}")
     m2.metric("Jaccard", f"{jaccard(ranks_a, ranks_b):.0%}")
     m3.metric("NEW in B", len(set(ranks_b) - set(ranks_a)))
-    m4.metric(
-        "Spearman ρ (shared)",
-        "n/a" if corr.coefficient is None else f"{corr.coefficient:.2f}",
-        help=corr.reason or "Rank correlation on papers present in both lists. 1 = same order, -1 = reversed.",
-    )
 
     b_rows, a_rows = head_to_head_rows(ranks_a, ranks_b)
     left, right = st.columns(2)
